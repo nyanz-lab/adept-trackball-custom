@@ -6,10 +6,6 @@ Adept Trackball Custom は、Adept Trackball（Ploopy）をベースに、独自
 このリポジトリでは、Adept Trackball Custom で使用しているファームウェア（キーマップ）のソースコードを公開しています。
 また、Adept Trackball Custom の使用方法についても説明します。
 
-## 🛒 BOOTHで販売中
-このトラックボールはBOOTHにて販売しています。
-https://nyanz-lab.booth.pm/items/7856144
-
 ## キーマップについて
 
 Adept Trackball Custom では、QMK/VIA を用いて独自のキーマップを構成しています。
