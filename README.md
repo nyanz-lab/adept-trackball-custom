@@ -62,4 +62,26 @@ RGB LED は動作状態に応じて自動的に色が変化します。
 書き込み後、自動的に再起動し、通常モードに戻ります。
 
 ### ライティング画像
+起動時（デフォルトレイヤー）は光りません。
+- レイヤー1
+![layer1](images/layer1.JPG)
+- レイヤー2
+![layer2](images/layer2.JPG)
+- レイヤー3
+![layer3](images/layer3.JPG)
+- レイヤー4
+![layer4](images/layer4.JPG)
+- レイヤー5
+![layer5](images/layer5.JPG)
+- レイヤー6
+![layer6](images/layer6.JPG)
+- レイヤー7
+![layer7](images/layer7.JPG)
+- ドラッグスクロール  
+![dragscroll](images/dragscroll.JPG)
 
+### PCB画像
+- 表面  
+![PCB1](images/pcb1.JPG)
+- 裏面  
+![PCB2](images/pcb2.JPG)
