@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Ploopy Adept 総合コントローラー</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 10px; background: #f5f5f5; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="number"], select { padding: 5px; font-size: 16px; width: 150px; }
+        button { padding: 10px 15px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; }
+        button:hover { background: #0056b3; }
+        #connectBtn { background: #28a745; }
+        #connectBtn:hover { background: #218838; }
+        #readBtn { background: #17a2b8; }
+        #readBtn:hover { background: #138496; }
+        #log { background: #222; color: #00ff00; padding: 15px; border-radius: 4px; font-family: monospace; height: 220px; overflow-y: scroll; white-space: pre-wrap; }
+        .input-group-custom { margin-top: 5px; padding-left: 10px; border-left: 3px solid #007bff; }
+    </style>
+</head>
+<body>
+
+    <h2>🛠️ Ploopy Adept 総合コントローラー</h2>
+
+    <div class="card">
+        <button id="connectBtn">1. トラックボールに接続</button>
+        <button id="readBtn" disabled>現在の設定を読み出す</button>
+        <div id="statusText" style="color: red; font-weight: bold; margin-top: 5px;">状態: 未接続</div>
+    </div>
+
+    <div class="card">
+        <div class="form-group">
+            <label for="angleInput">① 角度補正 (Rotation Angle):</label>
+            <input type="number" id="angleInput" value="0"> 度
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="toggleCheck"> ② スクロールボタンをクリック切り替えにする（トグル化）
+            </label>
+        </div>
+
+        <!-- ★追加：ドラッグスクロール速度（分割数）の入力項目 -->
+        <div class="form-group">
+            <label for="scrollSpeedDivInput">③ ドラッグスクロール減速比 (大きいほど遅く精密になります):</label>
+            <input type="number" id="scrollSpeedDivInput" min="1" max="32" value="8">
+        </div>
+
+        <div class="form-group">
+            <label for="stepsSelect">④ カーソルDPIの段階数:</label>
+            <select id="stepsSelect">
+                <option value="1">1段階（固定）</option>
+                <option value="2">2段階切り替え</option>
+                <option value="3" selected>3段階切り替え</option>
+            </select>
+            
+            <div class="input-group-custom">
+                <div style="margin: 5px 0;">1段階目: <input type="number" id="dpi0" value="800" step="100"> DPI</div>
+                <div style="margin: 5px 0;" id="divDpi1">2段階目: <input type="number" id="dpi1" value="1200" step="100"> DPI</div>
+                <div style="margin: 5px 0;" id="divDpi2">3段階目: <input type="number" id="dpi2" value="1600" step="100"> DPI</div>
+            </div>
+        </div>
+
+        <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
+
+        <div class="form-group">
+            <label for="hzSelect">⑤ ポーリングレート（データ送信頻度）:</label>
+            <select id="hzSelect">
+                <option value="1">1000Hz (間隔: 1ms)</option>
+                <option value="2" selected>500Hz (間隔: 2ms)</option>
+                <option value="4">250Hz (間隔: 4ms)</option>
+                <option value="8">125Hz (間隔: 8ms)</option>
+            </select>
+        </div>
+
+        <button id="sendBtn" disabled style="margin-top: 10px;">設定をトラックボールに送信（保存）</button>
+    </div>
+
+    <h3>ログ出力</h3>
+    <div id="log">接続待ち...</div>
+
+    <script>
+        let rawHidDevice = null;
+        const connectBtn = document.getElementById('connectBtn');
+        const readBtn = document.getElementById('readBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const angleInput = document.getElementById('angleInput');
+        const toggleCheck = document.getElementById('toggleCheck');
+        const scrollSpeedDivInput = document.getElementById('scrollSpeedDivInput'); // ★追加
+        
+        const stepsSelect = document.getElementById('stepsSelect');
+        const dpi0 = document.getElementById('dpi0');
+        const dpi1 = document.getElementById('dpi1');
+        const dpi2 = document.getElementById('dpi2');
+        const divDpi1 = document.getElementById('divDpi1');
+        const divDpi2 = document.getElementById('divDpi2');
+        
+        const hzSelect = document.getElementById('hzSelect');
+
+        const logDiv = document.getElementById('log');
+        const statusText = document.getElementById('statusText');
+
+        function updateDpiUi() {
+            const steps = parseInt(stepsSelect.value, 10);
+            if (steps === 1) { divDpi1.style.opacity = "0.3"; dpi1.disabled = true; divDpi2.style.opacity = "0.3"; dpi2.disabled = true; }
+            else if (steps === 2) { divDpi1.style.opacity = "1"; dpi1.disabled = false; divDpi2.style.opacity = "0.3"; dpi2.disabled = true; }
+            else { divDpi1.style.opacity = "1"; dpi1.disabled = false; divDpi2.style.opacity = "1"; dpi2.disabled = false; }
+        }
+        stepsSelect.addEventListener('change', updateDpiUi);
+
+        function addLog(message) {
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0];
+            logDiv.textContent += `\n[${timeStr}] ${message}`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                const devices = await navigator.hid.requestDevice({
+                    filters: [{ usagePage: 0xFF60, usage: 0x0061 }]
+                });
+                if (devices.length === 0) return;
+
+                rawHidDevice = devices[0];
+                await rawHidDevice.open();
+
+                addLog("[SUCCESS] トラックボールと接続しました。");
+                statusText.textContent = "状態: 接続完了";
+                statusText.style.color = "green";
+                sendBtn.disabled = false;
+                readBtn.disabled = false;
+
+                rawHidDevice.oninputreport = (event) => {
+                    const { data } = event;
+                    const resArray = new Uint8Array(data.buffer);
+                    
+                    if (resArray.length > 5 && resArray[0] === 0x3A && resArray[1] === 0x99) {
+                        let angle = resArray[3];
+                        if (angle > 127) angle -= 256;
+                        const scrollDiv = resArray[4]; // ★デバイスからの速度設定読み出し
+                        const isToggle = (resArray[5] === 1);
+                        
+                        const steps = resArray[6];
+                        const val0 = (resArray[7] << 8) | resArray[8];
+                        const val1 = (resArray[9] << 8) | resArray[10];
+                        const val2 = (resArray[11] << 8) | resArray[12];
+                        
+                        const hzMs = resArray[13];
+
+                        // 画面に反映
+                        angleInput.value = angle;
+                        scrollSpeedDivInput.value = scrollDiv; // ★UIに反映
+                        toggleCheck.checked = isToggle;
+                        stepsSelect.value = steps.toString();
+                        dpi0.value = val0;
+                        dpi1.value = val1;
+                        dpi2.value = val2;
+                        hzSelect.value = hzMs.toString();
+
+                        updateDpiUi();
+                        
+                        let hzStr = "500Hz";
+                        if(hzMs === 1) hzStr = "1000Hz";
+                        if(hzMs === 4) hzStr = "250Hz";
+                        if(hzMs === 8) hzStr = "125Hz";
+
+                        addLog(`【同期完了】角度: ${angle}度 / 減速比: ${scrollDiv} / トグル: ${isToggle ? "ON" : "OFF"} / 段階数: ${steps} / レート: ${hzStr}`);
+                    }
+                };
+            } catch (err) {
+                addLog(`[ERROR] 接続失敗: ${err.message}`);
+            }
+        });
+
+        // 送信
+        sendBtn.addEventListener('click', async () => {
+            if (!rawHidDevice) return;
+
+            const reportData = new Uint8Array(32);
+            reportData[0] = 0x3A; 
+            reportData[1] = 0x01; 
+            reportData[2] = 2; 
+            reportData[3] = parseInt(angleInput.value, 10);
+            reportData[4] = parseInt(scrollSpeedDivInput.value, 10); // ★UIの数値をパケットに乗せる
+            reportData[5] = toggleCheck.checked ? 1 : 0;
+            
+            const steps = parseInt(stepsSelect.value, 10);
+            const val0 = parseInt(dpi0.value, 10);
+            const val1 = parseInt(dpi1.value, 10);
+            const val2 = parseInt(dpi2.value, 10);
+            
+            reportData[6] = steps;
+            reportData[7] = (val0 >> 8) & 0xFF;  reportData[8] = val0 & 0xFF;
+            reportData[9] = (val1 >> 8) & 0xFF;  reportData[10] = val1 & 0xFF;
+            reportData[11] = (val2 >> 8) & 0xFF; reportData[12] = val2 & 0xFF;
+            
+            reportData[13] = parseInt(hzSelect.value, 10); 
+
+            try {
+                addLog(`設定を送信中...`);
+                await rawHidDevice.sendReport(0x00, reportData);
+            } catch (err) {
+                addLog(`[ERROR] 送信失敗: ${err.message}`);
+            }
+        });
+
+        // 読み出し
+        readBtn.addEventListener('click', async () => {
+            if (!rawHidDevice) return;
+            const reportData = new Uint8Array(32);
+            reportData[0] = 0x3A;
+            reportData[1] = 0x02; 
+            try {
+                await rawHidDevice.sendReport(0x00, reportData);
+            } catch (err) {
+                addLog(`[ERROR] 読み出し失敗: ${err.message}`);
+            }
+        });
+    </script>
+</body>
+</html>
