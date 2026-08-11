@@ -17,6 +17,7 @@
         #readBtn:hover { background: #138496; }
         #log { background: #222; color: #00ff00; padding: 15px; border-radius: 4px; font-family: monospace; height: 220px; overflow-y: scroll; white-space: pre-wrap; }
         .input-group-custom { margin-top: 5px; padding-left: 10px; border-left: 3px solid #007bff; }
+        .demo-group { margin-top: 5px; padding-left: 10px; border-left: 3px solid #28a745; }
     </style>
 </head>
 <body>
@@ -41,7 +42,6 @@
             </label>
         </div>
 
-        <!-- ★追加：ドラッグスクロール速度（分割数）の入力項目 -->
         <div class="form-group">
             <label for="scrollSpeedDivInput">③ ドラッグスクロール減速比 (大きいほど遅く精密になります):</label>
             <input type="number" id="scrollSpeedDivInput" min="1" max="32" value="8">
@@ -74,6 +74,52 @@
             </select>
         </div>
 
+        <!-- ★追加：デモモード設定 -->
+        <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="demoEnableCheck" checked> ⑥ 無操作時にデモモード（LED演出）を発動する
+            </label>
+            
+            <div class="demo-group" id="demoSettingsGroup">
+                <div style="margin: 8px 0;">
+                    移行時間 (秒): 
+                    <input type="number" id="demoTimeoutInput" min="1" max="3600" value="60"> 秒
+                </div>
+                <div style="margin: 8px 0;">
+                    ライティング演出: 
+                    <select id="demoEffectSelect" style="width: 220px;">
+                        <option value="1">STATIC_LIGHT</option>
+    
+                        <!-- BREATHING (2 ~ 5) -->
+                        <option value="2">BREATHING_1</option>
+                        <option value="3">BREATHING_2</option>
+                        <option value="4">BREATHING_3</option>
+                        <option value="5">BREATHING_4</option>
+
+                        <!-- RAINBOW_MOOD (6 ~ 8) -->
+                        <option value="6">RAINBOW_MOOD_1</option>
+                        <option value="7">RAINBOW_MOOD_2</option>
+                        <option value="8">RAINBOW_MOOD_3</option>
+
+                        <!-- RAINBOW_SWIRL (9 ~ 14) -->
+                        <option value="9" selected>RAINBOW_SWIRL_1</option>
+                        <option value="10">RAINBOW_SWIRL_2</option>
+                        <option value="11">RAINBOW_SWIRL_3</option>
+                        <option value="12">RAINBOW_SWIRL_4</option>
+                        <option value="13">RAINBOW_SWIRL_5</option>
+                        <option value="14">RAINBOW_SWIRL_6</option>
+
+                        <!-- KNIGHT (21 ~ 23) -->
+                        <option value="21">KNIGHT_1</option>
+                        <option value="22">KNIGHT_2</option>
+                        <option value="23">KNIGHT_3</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <button id="sendBtn" disabled style="margin-top: 10px;">設定をトラックボールに送信（保存）</button>
     </div>
 
@@ -87,7 +133,7 @@
         const sendBtn = document.getElementById('sendBtn');
         const angleInput = document.getElementById('angleInput');
         const toggleCheck = document.getElementById('toggleCheck');
-        const scrollSpeedDivInput = document.getElementById('scrollSpeedDivInput'); // ★追加
+        const scrollSpeedDivInput = document.getElementById('scrollSpeedDivInput');
         
         const stepsSelect = document.getElementById('stepsSelect');
         const dpi0 = document.getElementById('dpi0');
@@ -97,6 +143,12 @@
         const divDpi2 = document.getElementById('divDpi2');
         
         const hzSelect = document.getElementById('hzSelect');
+
+        // ★追加要素の取得
+        const demoEnableCheck = document.getElementById('demoEnableCheck');
+        const demoTimeoutInput = document.getElementById('demoTimeoutInput');
+        const demoEffectSelect = document.getElementById('demoEffectSelect');
+        const demoSettingsGroup = document.getElementById('demoSettingsGroup');
 
         const logDiv = document.getElementById('log');
         const statusText = document.getElementById('statusText');
@@ -108,6 +160,15 @@
             else { divDpi1.style.opacity = "1"; dpi1.disabled = false; divDpi2.style.opacity = "1"; dpi2.disabled = false; }
         }
         stepsSelect.addEventListener('change', updateDpiUi);
+
+        // ★デモモードUIの制御
+        function updateDemoUi() {
+            const enabled = demoEnableCheck.checked;
+            demoSettingsGroup.style.opacity = enabled ? "1" : "0.3";
+            demoTimeoutInput.disabled = !enabled;
+            demoEffectSelect.disabled = !enabled;
+        }
+        demoEnableCheck.addEventListener('change', updateDemoUi);
 
         function addLog(message) {
             const now = new Date();
@@ -139,7 +200,7 @@
                     if (resArray.length > 5 && resArray[0] === 0x3A && resArray[1] === 0x99) {
                         let angle = resArray[3];
                         if (angle > 127) angle -= 256;
-                        const scrollDiv = resArray[4]; // ★デバイスからの速度設定読み出し
+                        const scrollDiv = resArray[4];
                         const isToggle = (resArray[5] === 1);
                         
                         const steps = resArray[6];
@@ -149,9 +210,14 @@
                         
                         const hzMs = resArray[13];
 
+                        // ★デモモード値の抽出
+                        const demoEnable = (resArray[14] === 1);
+                        const demoTimeout = (resArray[15] << 8) | resArray[16];
+                        const demoEffect = resArray[17];
+
                         // 画面に反映
                         angleInput.value = angle;
-                        scrollSpeedDivInput.value = scrollDiv; // ★UIに反映
+                        scrollSpeedDivInput.value = scrollDiv;
                         toggleCheck.checked = isToggle;
                         stepsSelect.value = steps.toString();
                         dpi0.value = val0;
@@ -159,14 +225,20 @@
                         dpi2.value = val2;
                         hzSelect.value = hzMs.toString();
 
+                        // ★デモモードUIの反映
+                        demoEnableCheck.checked = demoEnable;
+                        demoTimeoutInput.value = demoTimeout;
+                        demoEffectSelect.value = demoEffect.toString();
+
                         updateDpiUi();
+                        updateDemoUi();
                         
                         let hzStr = "500Hz";
                         if(hzMs === 1) hzStr = "1000Hz";
                         if(hzMs === 4) hzStr = "250Hz";
                         if(hzMs === 8) hzStr = "125Hz";
 
-                        addLog(`【同期完了】角度: ${angle}度 / 減速比: ${scrollDiv} / トグル: ${isToggle ? "ON" : "OFF"} / 段階数: ${steps} / レート: ${hzStr}`);
+                        addLog(`【同期完了】角度: ${angle}度 / 減速比: ${scrollDiv} / トグル: ${isToggle ? "ON" : "OFF"} / レート: ${hzStr} / デモ: ${demoEnable ? demoTimeout + "秒" : "OFF"}`);
                     }
                 };
             } catch (err) {
@@ -183,7 +255,7 @@
             reportData[1] = 0x01; 
             reportData[2] = 2; 
             reportData[3] = parseInt(angleInput.value, 10);
-            reportData[4] = parseInt(scrollSpeedDivInput.value, 10); // ★UIの数値をパケットに乗せる
+            reportData[4] = parseInt(scrollSpeedDivInput.value, 10);
             reportData[5] = toggleCheck.checked ? 1 : 0;
             
             const steps = parseInt(stepsSelect.value, 10);
@@ -197,6 +269,16 @@
             reportData[11] = (val2 >> 8) & 0xFF; reportData[12] = val2 & 0xFF;
             
             reportData[13] = parseInt(hzSelect.value, 10); 
+
+            // ★追加：デモモードパラメータのセット
+            const demoEnable = demoEnableCheck.checked ? 1 : 0;
+            const demoTimeout = parseInt(demoTimeoutInput.value, 10);
+            const demoEffect = parseInt(demoEffectSelect.value, 10);
+
+            reportData[14] = demoEnable;
+            reportData[15] = (demoTimeout >> 8) & 0xFF; // Big-endian (上位)
+            reportData[16] = demoTimeout & 0xFF;        // Big-endian (下位)
+            reportData[17] = demoEffect;
 
             try {
                 addLog(`設定を送信中...`);
