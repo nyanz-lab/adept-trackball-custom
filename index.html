@@ -4,135 +4,358 @@
     <meta charset="UTF-8">
     <title>Ploopy Adept 総合コントローラー</title>
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 10px; background: #f5f5f5; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        body { font-family: sans-serif; max-width: 1000px; margin: 20px auto; padding: 10px; background: #f5f5f5; }
+        
+        .main-layout { display: flex; gap: 20px; align-items: flex-start; }
+        .left-column { flex: 1; min-width: 0; }
+        .right-column { width: 380px; flex-shrink: 0; position: sticky; top: 20px; }
+
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; display: none; }
+        .card.active { display: block; }
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; }
         input[type="number"], select { padding: 5px; font-size: 16px; width: 150px; }
         button { padding: 10px 15px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; }
         button:hover { background: #0056b3; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
         #connectBtn { background: #28a745; }
-        #connectBtn:hover { background: #218838; }
+        #connectBtn:hover:not(:disabled) { background: #218838; }
         #readBtn { background: #17a2b8; }
-        #readBtn:hover { background: #138496; }
-        #log { background: #222; color: #00ff00; padding: 15px; border-radius: 4px; font-family: monospace; height: 220px; overflow-y: scroll; white-space: pre-wrap; }
+        #readBtn:hover:not(:disabled) { background: #138496; }
+        #resetBtn { background: #ffc107; color: #212529; }
+        #resetBtn:hover:not(:disabled) { background: #e0a800; }
+        
+        #log { background: #222; color: #00ff00; padding: 15px; border-radius: 4px; font-family: monospace; height: 320px; overflow-y: scroll; white-space: pre-wrap; font-size: 13px; }
+        
         .input-group-custom { margin-top: 5px; padding-left: 10px; border-left: 3px solid #007bff; }
         .demo-group { margin-top: 5px; padding-left: 10px; border-left: 3px solid #28a745; }
+        .button-group { margin-top: 15px; display: flex; gap: 10px; }
+        
+        .diagnostic-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        .diagnostic-table th, .diagnostic-table td { border: 1px solid #ddd; padding: 8px 10px; text-align: center; }
+        .diagnostic-table th { background: #f1f3f5; font-weight: bold; }
+        .diagnostic-table td:first-child { text-align: left; font-weight: bold; }
+        .diagnostic-value { font-family: monospace; font-weight: bold; }
+
+        #diagnosticStartBtn { background: #6f42c1; }
+        #diagnosticStartBtn:hover:not(:disabled) { background: #59339d; }
+        #diagnosticStopBtn { background: #6c757d; }
+        #diagnosticStopBtn:hover:not(:disabled) { background: #545b62; }
+        .diagnostic-note { font-size: 13px; color: #666; margin-top: 8px; }
+        .diagnostic-summary-info { display: flex; gap: 20px; margin-top: 12px; font-size: 14px; }
+
+        .tab-container { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
+        .tab-btn { padding: 8px 12px; font-size: 13px; background: #e0e0e0; color: #333; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .tab-btn.active { background: #007bff; color: white; }
+        .tab-btn:hover:not(.active) { background: #d0d0d0; }
+
+        @media (max-width: 800px) {
+            .main-layout { flex-direction: column; }
+            .right-column { width: 100%; position: static; }
+        }
     </style>
 </head>
 <body>
 
     <h2>🛠️ Ploopy Adept 総合コントローラー</h2>
 
-    <div class="card">
-        <button id="connectBtn">1. トラックボールに接続</button>
-        <button id="readBtn" disabled>現在の設定を読み出す</button>
-        <div id="statusText" style="color: red; font-weight: bold; margin-top: 5px;">状態: 未接続</div>
-    </div>
-
-    <div class="card">
-        <div class="form-group">
-            <label for="angleInput">① 角度補正 (Rotation Angle):</label>
-            <input type="number" id="angleInput" value="0"> 度
-        </div>
-
-        <div class="form-group">
-            <label>
-                <input type="checkbox" id="toggleCheck"> ② スクロールボタンをクリック切り替えにする（トグル化）
-            </label>
-        </div>
-
-        <div class="form-group">
-            <label for="scrollSpeedDivInput">③ ドラッグスクロール減速比 (大きいほど遅く精密になります):</label>
-            <input type="number" id="scrollSpeedDivInput" min="1" max="32" value="8">
-        </div>
-
-        <div class="form-group">
-            <label for="stepsSelect">④ カーソルDPIの段階数:</label>
-            <select id="stepsSelect">
-                <option value="1">1段階（固定）</option>
-                <option value="2">2段階切り替え</option>
-                <option value="3" selected>3段階切り替え</option>
-            </select>
-            
-            <div class="input-group-custom">
-                <div style="margin: 5px 0;">1段階目: <input type="number" id="dpi0" value="800" step="100"> DPI</div>
-                <div style="margin: 5px 0;" id="divDpi1">2段階目: <input type="number" id="dpi1" value="1200" step="100"> DPI</div>
-                <div style="margin: 5px 0;" id="divDpi2">3段階目: <input type="number" id="dpi2" value="1600" step="100"> DPI</div>
+    <div class="main-layout">
+        <div class="left-column">
+            <div class="card active" style="display: block;">
+                <button id="connectBtn">1. トラックボールに接続</button>
+                <button id="readBtn" disabled>現在の設定を読み出す</button>
+                <div id="statusText" style="color: red; font-weight: bold; margin-top: 5px;">状態: 未接続</div>
             </div>
-        </div>
 
-        <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
+            <div class="tab-container">
+                <button class="tab-btn active" data-target="tab-pointer">基本・ポインタ</button>
+                <button class="tab-btn" data-target="tab-scroll">スクロール・ボタン</button>
+                <button class="tab-btn" data-target="tab-dpi">DPI設定</button>
+                <button class="tab-btn" data-target="tab-led">LED・デモ</button>
+                <button class="tab-btn" data-target="tab-advanced">診断</button>
+            </div>
 
-        <div class="form-group">
-            <label for="hzSelect">⑤ ポーリングレート（データ送信頻度）:</label>
-            <select id="hzSelect">
-                <option value="1">1000Hz (間隔: 1ms)</option>
-                <option value="2" selected>500Hz (間隔: 2ms)</option>
-                <option value="4">250Hz (間隔: 4ms)</option>
-                <option value="8">125Hz (間隔: 8ms)</option>
-            </select>
-        </div>
-
-        <!-- ★追加：デモモード設定 -->
-        <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
-
-        <div class="form-group">
-            <label>
-                <input type="checkbox" id="demoEnableCheck" checked> ⑥ 無操作時にデモモード（LED演出）を発動する
-            </label>
-            
-            <div class="demo-group" id="demoSettingsGroup">
-                <div style="margin: 8px 0;">
-                    移行時間 (秒): 
-                    <input type="number" id="demoTimeoutInput" min="1" max="3600" value="60"> 秒
+            <div class="card active" id="tab-pointer">
+                <h3 style="margin-top:0;">基本・ポインタ設定</h3>
+                <div class="form-group">
+                    <label for="angleInput">角度補正 (Rotation Angle):</label>
+                    <input type="number" id="angleInput" min="-180" max="180" value="0"> 度
                 </div>
-                <div style="margin: 8px 0;">
-                    ライティング演出: 
-                    <select id="demoEffectSelect" style="width: 220px;">
-                        <option value="1">STATIC_LIGHT</option>
-    
-                        <!-- BREATHING (2 ~ 5) -->
-                        <option value="2">BREATHING_1</option>
-                        <option value="3">BREATHING_2</option>
-                        <option value="4">BREATHING_3</option>
-                        <option value="5">BREATHING_4</option>
 
-                        <!-- RAINBOW_MOOD (6 ~ 8) -->
-                        <option value="6">RAINBOW_MOOD_1</option>
-                        <option value="7">RAINBOW_MOOD_2</option>
-                        <option value="8">RAINBOW_MOOD_3</option>
+                <div class="form-group">
+                    <label for="lodSelect">リフトオフディスタンス (LOD):</label>
+                    <select id="lodSelect">
+                        <option value="2" selected>2mm (標準)</option>
+                        <option value="3">3mm (高)</option>
+                    </select>
+                </div>
 
-                        <!-- RAINBOW_SWIRL (9 ~ 14) -->
-                        <option value="9" selected>RAINBOW_SWIRL_1</option>
-                        <option value="10">RAINBOW_SWIRL_2</option>
-                        <option value="11">RAINBOW_SWIRL_3</option>
-                        <option value="12">RAINBOW_SWIRL_4</option>
-                        <option value="13">RAINBOW_SWIRL_5</option>
-                        <option value="14">RAINBOW_SWIRL_6</option>
-
-                        <!-- KNIGHT (21 ~ 23) -->
-                        <option value="21">KNIGHT_1</option>
-                        <option value="22">KNIGHT_2</option>
-                        <option value="23">KNIGHT_3</option>
+                <div class="form-group">
+                    <label for="hzSelect">ポーリングレート（データ送信頻度）:</label>
+                    <select id="hzSelect">
+                        <option value="1" selected>1000Hz (間隔: 1ms)</option>
+                        <option value="2">500Hz (間隔: 2ms)</option>
+                        <option value="4">250Hz (間隔: 4ms)</option>
+                        <option value="8">125Hz (間隔: 8ms)</option>
                     </select>
                 </div>
             </div>
+
+            <div class="card" id="tab-scroll">
+                <h3 style="margin-top:0;">スクロール・ボタン設定</h3>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="toggleCheck"> スクロールボタンをクリック切り替えにする（トグル化）
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="invertVCheck"> ドラッグスクロールの上下方向を反転する (Windows向け)
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="scrollSpeedDivInput">ドラッグスクロール減速比 (大きいほど遅く精密になります):</label>
+                    <input type="number" id="scrollSpeedDivInput" min="1" max="32" value="8">
+                </div>
+            </div>
+
+            <div class="card" id="tab-dpi">
+                <h3 style="margin-top:0;">DPI（カーソル速度）設定</h3>
+                <div class="form-group">
+                    <label for="stepsSelect">カーソルDPIの段階数:</label>
+                    <select id="stepsSelect">
+                        <option value="1">1段階（固定）</option>
+                        <option value="2">2段階切り替え</option>
+                        <option value="3" selected>3段階切り替え</option>
+                    </select>
+                    
+                    <div class="input-group-custom">
+                        <div style="margin: 5px 0;">1段階目: <input type="number" id="dpi0" value="800" step="100"> DPI</div>
+                        <div style="margin: 5px 0;" id="divDpi1">2段階目: <input type="number" id="dpi1" value="1200" step="100"> DPI</div>
+                        <div style="margin: 5px 0;" id="divDpi2">3段階目: <input type="number" id="dpi2" value="1600" step="100"> DPI</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="tab-led">
+                <h3 style="margin-top:0;">LED・デモモード設定</h3>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="demoEnableCheck" checked> 無操作時にデモモード（LED演出）を発動する
+                    </label>
+                    
+                    <div class="demo-group" id="demoSettingsGroup">
+                        <div style="margin: 8px 0;">
+                            移行時間 (秒): 
+                            <input type="number" id="demoTimeoutInput" min="1" max="3600" value="60"> 秒
+                        </div>
+                        <div style="margin: 8px 0;">
+                            ライティング演出: 
+                            <select id="demoEffectSelect" style="width: 220px;">
+                                <option value="1">STATIC_LIGHT</option>
+                                <option value="2">BREATHING_1</option>
+                                <option value="3">BREATHING_2</option>
+                                <option value="4">BREATHING_3</option>
+                                <option value="5">BREATHING_4</option>
+                                <option value="6">RAINBOW_MOOD_1</option>
+                                <option value="7">RAINBOW_MOOD_2</option>
+                                <option value="8">RAINBOW_MOOD_3</option>
+                                <option value="9" selected>RAINBOW_SWIRL_1</option>
+                                <option value="10">RAINBOW_SWIRL_2</option>
+                                <option value="11">RAINBOW_SWIRL_3</option>
+                                <option value="12">RAINBOW_SWIRL_4</option>
+                                <option value="13">RAINBOW_SWIRL_5</option>
+                                <option value="14">RAINBOW_SWIRL_6</option>
+                                <option value="21">KNIGHT_1</option>
+                                <option value="22">KNIGHT_2</option>
+                                <option value="23">KNIGHT_3</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="tab-advanced">
+                <h3 style="margin-top:0;">PMW3360 センサー診断</h3>
+                <div>
+                    <button id="diagnosticStartBtn" disabled>測定開始</button>
+                    <button id="diagnosticStopBtn" disabled>測定停止</button>
+                    <span id="diagnosticStatus" style="margin-left: 10px; font-weight: bold;">測定: 停止中</span>
+                </div>
+                <div class="diagnostic-note">
+                    測定開始を押したときだけPMW3360を読み出します。測定中は約100ms間隔で取得します。
+                </div>
+
+                <div class="diagnostic-summary-info">
+                    <div>測定時間: <span id="diagDuration" style="font-family: monospace; font-weight: bold;">0.0 秒</span></div>
+                    <div>サンプル数: <span id="diagSampleCount" style="font-family: monospace; font-weight: bold;">0</span></div>
+                </div>
+
+                <table class="diagnostic-table">
+                    <thead>
+                        <tr>
+                            <th>項目</th>
+                            <th>現在の値</th>
+                            <th>最小</th>
+                            <th>最大</th>
+                            <th>平均</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>SQUAL</td>
+                            <td><span id="diagSqual" class="diagnostic-value">--</span></td>
+                            <td><span id="diagSqualMin" class="diagnostic-value">--</span></td>
+                            <td><span id="diagSqualMax" class="diagnostic-value">--</span></td>
+                            <td><span id="diagSqualAvg" class="diagnostic-value">--</span></td>
+                        </tr>
+                        <tr>
+                            <td>Raw Data Sum</td>
+                            <td><span id="diagRawSum" class="diagnostic-value">--</span></td>
+                            <td><span id="diagRawSumMin" class="diagnostic-value">--</span></td>
+                            <td><span id="diagRawSumMax" class="diagnostic-value">--</span></td>
+                            <td><span id="diagRawSumAvg" class="diagnostic-value">--</span></td>
+                        </tr>
+                        <tr>
+                            <td>Maximum Raw Data</td>
+                            <td><span id="diagMaxRaw" class="diagnostic-value">--</span></td>
+                            <td><span id="diagMaxRawMin" class="diagnostic-value">--</span></td>
+                            <td><span id="diagMaxRawMax" class="diagnostic-value">--</span></td>
+                            <td><span id="diagMaxRawAvg" class="diagnostic-value">--</span></td>
+                        </tr>
+                        <tr>
+                            <td>Minimum Raw Data</td>
+                            <td><span id="diagMinRaw" class="diagnostic-value">--</span></td>
+                            <td><span id="diagMinRawMin" class="diagnostic-value">--</span></td>
+                            <td><span id="diagMinRawMax" class="diagnostic-value">--</span></td>
+                            <td><span id="diagMinRawAvg" class="diagnostic-value">--</span></td>
+                        </tr>
+                        <tr>
+                            <td>Shutter</td>
+                            <td><span id="diagShutter" class="diagnostic-value">--</span></td>
+                            <td><span id="diagShutterMin" class="diagnostic-value">--</span></td>
+                            <td><span id="diagShutterMax" class="diagnostic-value">--</span></td>
+                            <td><span id="diagShutterAvg" class="diagnostic-value">--</span></td>
+                        </tr>
+                        <tr>
+                            <td>Observation</td>
+                            <td colspan="4"><span id="diagObservation" class="diagnostic-value">--</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card active" style="display: block; background: #fafafa; border: 1px solid #ddd;">
+                <div class="button-group" style="margin-top:0;">
+                    <button id="sendBtn" disabled style="flex:1;">設定をトラックボールに送信（保存）</button>
+                    <button id="resetBtn" disabled>初期設定に戻す</button>
+                </div>
+            </div>
         </div>
 
-        <button id="sendBtn" disabled style="margin-top: 10px;">設定をトラックボールに送信（保存）</button>
+        <div class="right-column">
+            <div class="card active" style="display: block;">
+                <h3 style="margin-top:0;">ログ出力</h3>
+                <div id="log">接続待ち...</div>
+            </div>
+        </div>
     </div>
-
-    <h3>ログ出力</h3>
-    <div id="log">接続待ち...</div>
 
     <script>
         let rawHidDevice = null;
         const connectBtn = document.getElementById('connectBtn');
         const readBtn = document.getElementById('readBtn');
         const sendBtn = document.getElementById('sendBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const diagnosticStartBtn = document.getElementById('diagnosticStartBtn');
+        const diagnosticStopBtn = document.getElementById('diagnosticStopBtn');
+        const diagnosticStatus = document.getElementById('diagnosticStatus');
+        
+        const diagDuration = document.getElementById('diagDuration');
+        const diagSampleCount = document.getElementById('diagSampleCount');
+
+        const metrics = ['squal', 'rawSum', 'maxRaw', 'minRaw', 'shutter'];
+        const diagnosticStats = {};
+        metrics.forEach(m => {
+            diagnosticStats[m] = {
+                current: document.getElementById(`diag${m.charAt(0).toUpperCase() + m.slice(1)}`),
+                min: document.getElementById(`diag${m.charAt(0).toUpperCase() + m.slice(1)}Min`),
+                max: document.getElementById(`diag${m.charAt(0).toUpperCase() + m.slice(1)}Max`),
+                avg: document.getElementById(`diag${m.charAt(0).toUpperCase() + m.slice(1)}Avg`),
+                minVal: Infinity,
+                maxVal: -Infinity,
+                sumVal: 0
+            };
+        });
+        const diagObservation = document.getElementById('diagObservation');
+
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const cards = document.querySelectorAll('.card[id^="tab-"]');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                cards.forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active');
+                const targetId = btn.getAttribute('data-target');
+                document.getElementById(targetId).classList.add('active');
+            });
+        });
+
+        let diagnosticTimer = null;
+        let diagnosticMeasuring = false;
+        let diagnosticStartTime = 0;
+        let diagnosticSampleCount = 0;
+
+        function resetDiagnosticStats() {
+            diagnosticSampleCount = 0;
+            diagnosticStartTime = 0;
+            metrics.forEach(m => {
+                const stat = diagnosticStats[m];
+                stat.minVal = Infinity;
+                stat.maxVal = -Infinity;
+                stat.sumVal = 0;
+                stat.current.textContent = '--';
+                stat.min.textContent = '--';
+                stat.max.textContent = '--';
+                stat.avg.textContent = '--';
+            });
+            diagObservation.textContent = '--';
+            updateDiagnosticSummary();
+        }
+
+        function updateDiagnosticSummary() {
+            const elapsed = diagnosticStartTime ? (performance.now() - diagnosticStartTime) / 1000 : 0;
+            diagDuration.textContent = `${elapsed.toFixed(1)} 秒`;
+            diagSampleCount.textContent = diagnosticSampleCount;
+        }
+
+        function recordDiagnosticSample(valuesMap) {
+            if (!diagnosticMeasuring) return;
+            diagnosticSampleCount++;
+
+            metrics.forEach(m => {
+                const val = valuesMap[m];
+                const stat = diagnosticStats[m];
+                stat.minVal = Math.min(stat.minVal, val);
+                stat.maxVal = Math.max(stat.maxVal, val);
+                stat.sumVal += val;
+
+                stat.current.textContent = val;
+                stat.min.textContent = stat.minVal;
+                stat.max.textContent = stat.maxVal;
+                stat.avg.textContent = (stat.sumVal / diagnosticSampleCount).toFixed(1);
+            });
+
+            updateDiagnosticSummary();
+        }
+        
         const angleInput = document.getElementById('angleInput');
         const toggleCheck = document.getElementById('toggleCheck');
+        const invertVCheck = document.getElementById('invertVCheck');
         const scrollSpeedDivInput = document.getElementById('scrollSpeedDivInput');
         
         const stepsSelect = document.getElementById('stepsSelect');
@@ -144,14 +367,31 @@
         
         const hzSelect = document.getElementById('hzSelect');
 
-        // ★追加要素の取得
         const demoEnableCheck = document.getElementById('demoEnableCheck');
         const demoTimeoutInput = document.getElementById('demoTimeoutInput');
         const demoEffectSelect = document.getElementById('demoEffectSelect');
         const demoSettingsGroup = document.getElementById('demoSettingsGroup');
 
+        const lodSelect = document.getElementById('lodSelect');
+
         const logDiv = document.getElementById('log');
         const statusText = document.getElementById('statusText');
+
+        const DEFAULT_SETTINGS = {
+            lod: '2',
+            angle: 0,
+            toggle: false,
+            invertV: false,
+            scrollSpeedDiv: 8,
+            steps: '3',
+            dpi0: 800,
+            dpi1: 1200,
+            dpi2: 1600,
+            hz: '1',
+            demoEnable: true,
+            demoTimeout: 60,
+            demoEffect: '9'
+        };
 
         function updateDpiUi() {
             const steps = parseInt(stepsSelect.value, 10);
@@ -161,7 +401,6 @@
         }
         stepsSelect.addEventListener('change', updateDpiUi);
 
-        // ★デモモードUIの制御
         function updateDemoUi() {
             const enabled = demoEnableCheck.checked;
             demoSettingsGroup.style.opacity = enabled ? "1" : "0.3";
@@ -177,6 +416,83 @@
             logDiv.scrollTop = logDiv.scrollHeight;
         }
 
+        function applySettingsToForm(settings) {
+            lodSelect.value = settings.lod;
+            angleInput.value = settings.angle;
+            toggleCheck.checked = settings.toggle;
+            invertVCheck.checked = settings.invertV;
+            scrollSpeedDivInput.value = settings.scrollSpeedDiv;
+            stepsSelect.value = settings.steps;
+            dpi0.value = settings.dpi0;
+            dpi1.value = settings.dpi1;
+            dpi2.value = settings.dpi2;
+            hzSelect.value = settings.hz;
+            demoEnableCheck.checked = settings.demoEnable;
+            demoTimeoutInput.value = settings.demoTimeout;
+            demoEffectSelect.value = settings.demoEffect;
+
+            updateDpiUi();
+            updateDemoUi();
+        }
+
+        async function sendCurrentSettings() {
+            if (!rawHidDevice) return;
+
+            const reportData = new Uint8Array(32);
+            reportData[0] = 0x3A; 
+            reportData[1] = 0x01; 
+            reportData[2] = parseInt(lodSelect.value, 10);
+
+            const angle = parseInt(angleInput.value, 10);
+            reportData[3] = (angle >> 8) & 0xFF;
+            reportData[4] = angle & 0xFF;
+
+            reportData[5] = parseInt(scrollSpeedDivInput.value, 10);
+            reportData[6] = toggleCheck.checked ? 1 : 0;
+            
+            const steps = parseInt(stepsSelect.value, 10);
+            const val0 = parseInt(dpi0.value, 10);
+            const val1 = parseInt(dpi1.value, 10);
+            const val2 = parseInt(dpi2.value, 10);
+            
+            reportData[7] = steps;
+            reportData[8] = (val0 >> 8) & 0xFF;  reportData[9] = val0 & 0xFF;
+            reportData[10] = (val1 >> 8) & 0xFF; reportData[11] = val1 & 0xFF;
+            reportData[12] = (val2 >> 8) & 0xFF; reportData[13] = val2 & 0xFF;
+            reportData[14] = parseInt(hzSelect.value, 10); 
+
+            const demoEnable = demoEnableCheck.checked ? 1 : 0;
+            const demoTimeout = parseInt(demoTimeoutInput.value, 10);
+            const demoEffect = parseInt(demoEffectSelect.value, 10);
+
+            reportData[15] = demoEnable;
+            reportData[16] = (demoTimeout >> 8) & 0xFF;
+            reportData[17] = demoTimeout & 0xFF;
+            reportData[18] = demoEffect;
+            reportData[19] = invertVCheck.checked ? 1 : 0;
+
+            try {
+                addLog("設定を送信中...");
+                await rawHidDevice.sendReport(0x00, reportData);
+                addLog("[SUCCESS] 設定を送信しました。");
+            } catch (err) {
+                addLog(`[ERROR] 送信失敗: ${err.message}`);
+            }
+        }
+
+        async function requestDiagnostic(enabled) {
+            if (!rawHidDevice) return;
+            const reportData = new Uint8Array(32);
+            reportData[0] = 0x3A;
+            reportData[1] = 0x03; // 修正：診断用コマンドを 0x03 に変更
+            reportData[2] = enabled ? 1 : 0;
+            try {
+                await rawHidDevice.sendReport(0x00, reportData);
+            } catch (err) {
+                addLog(`[ERROR] 診断コマンド送信失敗: ${err.message}`);
+            }
+        }
+
         connectBtn.addEventListener('click', async () => {
             try {
                 const devices = await navigator.hid.requestDevice({
@@ -185,60 +501,72 @@
                 if (devices.length === 0) return;
 
                 rawHidDevice = devices[0];
-                await rawHidDevice.open();
+                if (!rawHidDevice.opened) {
+                    await rawHidDevice.open();
+                }
 
                 addLog("[SUCCESS] トラックボールと接続しました。");
                 statusText.textContent = "状態: 接続完了";
                 statusText.style.color = "green";
+                
                 sendBtn.disabled = false;
                 readBtn.disabled = false;
+                resetBtn.disabled = false;
+                diagnosticStartBtn.disabled = false;
+                diagnosticStopBtn.disabled = false;
 
                 rawHidDevice.oninputreport = (event) => {
                     const { data } = event;
                     const resArray = new Uint8Array(data.buffer);
                     
+                    if (resArray.length >= 10 && resArray[0] === 0x3A && resArray[1] === 0x92) {
+                        const enabled = resArray[2] === 1;
+                        const squal = resArray[3];
+                        const rawSum = resArray[4];
+                        const maxRaw = resArray[5];
+                        const minRaw = resArray[6];
+                        const shutter = (resArray[7] << 8) | resArray[8];
+                        const observation = resArray[9];
+
+                        recordDiagnosticSample({ squal, rawSum, maxRaw, minRaw, shutter });
+
+                        diagObservation.textContent = `0x${observation.toString(16).padStart(2, '0').toUpperCase()}`;
+                        diagnosticStatus.textContent = enabled ? "測定: 実行中" : "測定: 停止中";
+                        return;
+                    }
+
                     if (resArray.length > 5 && resArray[0] === 0x3A && resArray[1] === 0x99) {
-                        let angle = resArray[3];
-                        if (angle > 127) angle -= 256;
-                        const scrollDiv = resArray[4];
-                        const isToggle = (resArray[5] === 1);
-                        
-                        const steps = resArray[6];
-                        const val0 = (resArray[7] << 8) | resArray[8];
-                        const val1 = (resArray[9] << 8) | resArray[10];
-                        const val2 = (resArray[11] << 8) | resArray[12];
-                        
-                        const hzMs = resArray[13];
+                        const lod = resArray[2];
+                        let angleRaw = (resArray[3] << 8) | resArray[4];
+                        let angle = (angleRaw >= 0x8000) ? angleRaw - 0x10000 : angleRaw;
+                        const scrollDiv = resArray[5];
+                        const isToggle = (resArray[6] === 1);
+                        const steps = resArray[7];
+                        const val0 = (resArray[8] << 8) | resArray[9];
+                        const val1 = (resArray[10] << 8) | resArray[11];
+                        const val2 = (resArray[12] << 8) | resArray[13];
+                        const hzMs = resArray[14];
+                        const demoEnable = (resArray[15] === 1);
+                        const demoTimeout = (resArray[16] << 8) | resArray[17];
+                        const demoEffect = resArray[18];
+                        const invertV = (resArray[19] === 1);
 
-                        // ★デモモード値の抽出
-                        const demoEnable = (resArray[14] === 1);
-                        const demoTimeout = (resArray[15] << 8) | resArray[16];
-                        const demoEffect = resArray[17];
-
-                        // 画面に反映
-                        angleInput.value = angle;
-                        scrollSpeedDivInput.value = scrollDiv;
-                        toggleCheck.checked = isToggle;
-                        stepsSelect.value = steps.toString();
-                        dpi0.value = val0;
-                        dpi1.value = val1;
-                        dpi2.value = val2;
-                        hzSelect.value = hzMs.toString();
-
-                        // ★デモモードUIの反映
-                        demoEnableCheck.checked = demoEnable;
-                        demoTimeoutInput.value = demoTimeout;
-                        demoEffectSelect.value = demoEffect.toString();
-
-                        updateDpiUi();
-                        updateDemoUi();
-                        
-                        let hzStr = "500Hz";
-                        if(hzMs === 1) hzStr = "1000Hz";
-                        if(hzMs === 4) hzStr = "250Hz";
-                        if(hzMs === 8) hzStr = "125Hz";
-
-                        addLog(`【同期完了】角度: ${angle}度 / 減速比: ${scrollDiv} / トグル: ${isToggle ? "ON" : "OFF"} / レート: ${hzStr} / デモ: ${demoEnable ? demoTimeout + "秒" : "OFF"}`);
+                        applySettingsToForm({
+                            lod: lod.toString(),
+                            angle: angle,
+                            toggle: isToggle,
+                            invertV: invertV,
+                            scrollSpeedDiv: scrollDiv,
+                            steps: steps.toString(),
+                            dpi0: val0,
+                            dpi1: val1,
+                            dpi2: val2,
+                            hz: hzMs.toString(),
+                            demoEnable: demoEnable,
+                            demoTimeout: demoTimeout,
+                            demoEffect: demoEffect.toString()
+                        });
+                        addLog("[SYNC] トラックボールから設定を読み込みました。");
                     }
                 };
             } catch (err) {
@@ -246,54 +574,47 @@
             }
         });
 
-        // 送信
-        sendBtn.addEventListener('click', async () => {
-            if (!rawHidDevice) return;
+        sendBtn.addEventListener('click', sendCurrentSettings);
 
-            const reportData = new Uint8Array(32);
-            reportData[0] = 0x3A; 
-            reportData[1] = 0x01; 
-            reportData[2] = 2; 
-            reportData[3] = parseInt(angleInput.value, 10);
-            reportData[4] = parseInt(scrollSpeedDivInput.value, 10);
-            reportData[5] = toggleCheck.checked ? 1 : 0;
-            
-            const steps = parseInt(stepsSelect.value, 10);
-            const val0 = parseInt(dpi0.value, 10);
-            const val1 = parseInt(dpi1.value, 10);
-            const val2 = parseInt(dpi2.value, 10);
-            
-            reportData[6] = steps;
-            reportData[7] = (val0 >> 8) & 0xFF;  reportData[8] = val0 & 0xFF;
-            reportData[9] = (val1 >> 8) & 0xFF;  reportData[10] = val1 & 0xFF;
-            reportData[11] = (val2 >> 8) & 0xFF; reportData[12] = val2 & 0xFF;
-            
-            reportData[13] = parseInt(hzSelect.value, 10); 
-
-            // ★追加：デモモードパラメータのセット
-            const demoEnable = demoEnableCheck.checked ? 1 : 0;
-            const demoTimeout = parseInt(demoTimeoutInput.value, 10);
-            const demoEffect = parseInt(demoEffectSelect.value, 10);
-
-            reportData[14] = demoEnable;
-            reportData[15] = (demoTimeout >> 8) & 0xFF; // Big-endian (上位)
-            reportData[16] = demoTimeout & 0xFF;        // Big-endian (下位)
-            reportData[17] = demoEffect;
-
-            try {
-                addLog(`設定を送信中...`);
-                await rawHidDevice.sendReport(0x00, reportData);
-            } catch (err) {
-                addLog(`[ERROR] 送信失敗: ${err.message}`);
-            }
+        resetBtn.addEventListener('click', async () => {
+            if (!confirm("すべての設定を初期状態（デフォルト値）に戻してトラックボールに送信しますか？")) return;
+            applySettingsToForm(DEFAULT_SETTINGS);
+            addLog("[RESET] フォームを初期設定値に戻しました。");
+            await sendCurrentSettings();
         });
 
-        // 読み出し
+        diagnosticStartBtn.addEventListener('click', async () => {
+            if (!rawHidDevice || diagnosticTimer !== null) return;
+            resetDiagnosticStats();
+            diagnosticMeasuring = true;
+            diagnosticStartTime = performance.now();
+            diagnosticStatus.textContent = "測定: 実行中";
+
+            await requestDiagnostic(true);
+            diagnosticTimer = setInterval(() => { requestDiagnostic(true); }, 100);
+            addLog("[PMW3360] センサー測定を開始しました。");
+        });
+
+        diagnosticStopBtn.addEventListener('click', async () => {
+            if (!rawHidDevice) return;
+            if (diagnosticTimer !== null) {
+                clearInterval(diagnosticTimer);
+                diagnosticTimer = null;
+            }
+            diagnosticMeasuring = false;
+            updateDiagnosticSummary();
+            await requestDiagnostic(false);
+            diagnosticStatus.textContent = "測定: 停止中";
+            addLog("[PMW3360] センサー測定を停止しました。");
+        });
+
+        resetDiagnosticStats();
+
         readBtn.addEventListener('click', async () => {
             if (!rawHidDevice) return;
             const reportData = new Uint8Array(32);
-            reportData[0] = 0x3A;
-            reportData[1] = 0x02; 
+            reportData[0] = 0x3A; 
+            reportData[1] = 0x02; // 修正：設定読み出しは 0x02 を送信
             try {
                 await rawHidDevice.sendReport(0x00, reportData);
             } catch (err) {
